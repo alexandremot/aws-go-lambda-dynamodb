@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -13,52 +15,71 @@ import (
 
 func main() {
 
-	my_table := "my-table"
+	my_table := "deploy-status"
 	id := "679374c6-d940-4cb5-9422-9a7544487ac7"
 
-	// Using the SDK's default configuration, loading additional config
-	// and credentials values from the environment variables, shared
-	// credentials, and shared configuration files
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("sa-east-1"))
+	// Obtem as configurações de credenciais da AWS
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
 
-	// Using the Config value, create the DynamoDB client
-	client := dynamodb.NewFromConfig(cfg)
+	dynamoDbClient := dynamodb.NewFromConfig(cfg)
 
-	// Define the input parameters
-	input := &dynamodb.QueryInput{
+	// Define os query parameters
+	queryParameters := &dynamodb.QueryInput{
 		TableName:              aws.String(my_table),
 		KeyConditionExpression: aws.String("id = :id"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":id": &types.AttributeValueMemberS{Value: id},
 		},
-		ScanIndexForward: aws.Bool(false),
-		// IndexName:              aws.String("datetime"),
-		Limit:                  aws.Int32(1),
-		ConsistentRead:         aws.Bool(false),
-		ReturnConsumedCapacity: types.ReturnConsumedCapacityNone,
 	}
 
-	// Make the Query API call to DynamoDB
-	result, err := client.Query(context.TODO(), input)
+	// Exetuta o envio da query acima
+	result, err := dynamoDbClient.Query(context.TODO(), queryParameters)
 	if err != nil {
 		fmt.Println("Error querying DynamoDB table:", err)
 		return
 	}
 
-	// Check if any items were returned
-	if len(result.Items) == 0 {
+	mapContainingAllTheItemsWithId := result.Items
+
+	// Valida se foram retornados itens
+	if len(mapContainingAllTheItemsWithId) == 0 {
 		fmt.Println("No items found for the given ID")
 		return
 	}
 
-	// Get the last item
-	lastItem := result.Items[0]
+	// Define o slice para ontenção e ordenação dos datetimes
+	sliceContainingOnlyTheDatetimes := make([]string, len(mapContainingAllTheItemsWithId))
 
-	// Print the item details
-	fmt.Println("ID:", lastItem["id"])
-	fmt.Println("Status:", lastItem["status"])
-	fmt.Println("Datetime:", lastItem["datetime"])
+	// Preenche o slice somente com os valores de datetime
+	for i, m := range mapContainingAllTheItemsWithId {
+		sliceContainingOnlyTheDatetimes[i] = fmt.Sprintf("%v", m["datetime"])
+	}
+
+	// Ordena o slice em ordem descrescente de eventos
+	// ou seja, do mais recente para o evento inicial (mais antigo)
+	sort.Slice(sliceContainingOnlyTheDatetimes, func(i, j int) bool {
+		return sliceContainingOnlyTheDatetimes[i] > sliceContainingOnlyTheDatetimes[j]
+	})
+
+	var latestEventMap map[string]types.AttributeValue
+
+	// Localiza o map que contém o menor tempo (obtido acima)
+	for _, m := range mapContainingAllTheItemsWithId {
+		if fmt.Sprintf("%v", m["datetime"]) == sliceContainingOnlyTheDatetimes[0] {
+			latestEventMap = m
+			break
+		}
+	}
+
+	latestEventJsonBytes, err := json.Marshal(latestEventMap)
+	if err != nil {
+		// handle this error for me
+	}
+
+	latestEventJsonString := string(latestEventJsonBytes)
+
+	fmt.Println(latestEventJsonString)
 }
