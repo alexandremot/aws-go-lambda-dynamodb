@@ -5,15 +5,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-func main() {
+func consultaDynamo() string {
 
 	my_table := "deploy-status"
 	id := "679374c6-d940-4cb5-9422-9a7544487ac7"
@@ -39,7 +42,6 @@ func main() {
 	result, err := dynamoDbClient.Query(context.TODO(), queryParameters)
 	if err != nil {
 		fmt.Println("Error querying DynamoDB table:", err)
-		return
 	}
 
 	mapContainingAllTheItemsWithId := result.Items
@@ -47,7 +49,6 @@ func main() {
 	// Valida se foram retornados itens
 	if len(mapContainingAllTheItemsWithId) == 0 {
 		fmt.Println("No items found for the given ID")
-		return
 	}
 
 	// Define o slice para ontenção e ordenação dos datetimes
@@ -81,5 +82,36 @@ func main() {
 
 	latestEventJsonString := string(latestEventJsonBytes)
 
-	fmt.Println(latestEventJsonString)
+	return (latestEventJsonString)
+}
+
+type Response struct {
+	Message string `json:"message"`
+}
+
+func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	if request.HTTPMethod != "GET" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusMethodNotAllowed,
+			Body:       "Method not allowed",
+		}, nil
+	}
+
+	if request.Resource != "/dynamo" {
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusNotFound,
+			Body:       "Not found",
+		}, nil
+	}
+
+	body := consultaDynamo()
+
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       body,
+	}, nil
+}
+
+func main() {
+	lambda.Start(handler)
 }
