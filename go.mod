@@ -1,4 +1,4 @@
-module github.com/alexandremot/aws-go-dynamo
+module github.com/alexandremot/aws-go-lambda-dynamodb
 
 go 1.18
 
