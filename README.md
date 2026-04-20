@@ -1,6 +1,6 @@
 # AWS Go Lambda DynamoDB (PoC)
 
-Este projeto é uma prova de conceito (PoC) criada para demonstrar a integração entre AWS Lambda (usando Go) e DynamoDB. Foi desenvolvido como base para uma possível implementação em um projeto real de um grande banco.
+Este projeto é uma prova de conceito (PoC) criada para demonstrar a integração entre AWS Lambda (usando Go) e DynamoDB. Foi desenvolvido como base para uma possível implementação em um projeto real.
 
 ## Estrutura do Projeto
 
